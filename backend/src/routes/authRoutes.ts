@@ -1,9 +1,8 @@
 import express, { Router } from 'express';
-import { handleGoogleSignIn, handleCallback } from '../controllers/authController';
+import { createUserFromGoogle } from '../controllers/authController';
 
 const router: Router = express.Router();
 
-router.get('/signin/google', handleGoogleSignIn);
-router.get('/callback', handleCallback);
+router.post('/google/user', createUserFromGoogle);
 
 export default router;

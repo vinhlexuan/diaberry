@@ -11,7 +11,7 @@ import {
 import { Diary } from "./Diary";
 
 
-@Entity("user")
+@Entity("user", { schema: "diaberry" })
 export class User {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -27,6 +27,15 @@ export class User {
 
   @Column({ nullable: true })
   last_name?: string;
+
+  @Column({ nullable: true })
+  google_id?: string;
+
+  @Column({ nullable: true })
+  avatar_url?: string;
+
+  @Column({ default: 'google' })
+  provider!: string;
 
   @CreateDateColumn({ name: "created_at" })
   created_at!: Date;

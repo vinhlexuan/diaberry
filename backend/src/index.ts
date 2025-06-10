@@ -1,8 +1,10 @@
-import express, { Express } from 'express';
+import "reflect-metadata"; // This must be the first import
+import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
+import { initializeDatabase } from './config/database';
 
 dotenv.config();
 
@@ -18,18 +20,29 @@ app.use('/auth', authRoutes);
 app.use('/api/users', userRoutes);
 
 // Simple test route
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   res.send('Diaberry API is running');
 });
 
 // Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Initialize database then start server
+const startServer = async () => {
+  try {
+    await initializeDatabase();
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 export default app;
