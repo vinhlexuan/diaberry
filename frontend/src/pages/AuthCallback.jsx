@@ -1,11 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../utils/supabaseClient';
 
 function AuthCallback() {
   const [status, setStatus] = useState('Processing authentication...');
+  const hasProcessed = useRef(false);
 
   useEffect(() => {
     const handleAuthCallback = async () => {
+      if (hasProcessed.current) {
+        console.log('Already processed, skipping...');
+        return;
+      }
+
+      hasProcessed.current = true;
+
       try {
         const { data, error } = await supabase.auth.getSession();
         
@@ -16,7 +24,6 @@ function AuthCallback() {
           
           const user = data.session.user;
           
-          // Extract user info from Supabase user object
           const userData = {
             email: user.email,
             google_id: user.user_metadata?.sub || user.id,
@@ -29,7 +36,6 @@ function AuthCallback() {
 
           console.log('Sending user data to backend:', userData);
 
-          // Send user data to backend
           const response = await fetch('http://localhost:8080/auth/google/user', {
             method: 'POST',
             headers: {
@@ -41,15 +47,19 @@ function AuthCallback() {
           if (response.ok) {
             const result = await response.json();
             console.log('User created/updated:', result.user);
-            setStatus('User created successfully! Redirecting...');
+            setStatus('User created successfully! Redirecting to dashboard...');
             
-            // Store user info
             localStorage.setItem('user', JSON.stringify(result.user));
             localStorage.setItem('supabase_session', JSON.stringify(data.session));
             
             setTimeout(() => {
               window.location.href = '/dashboard';
             }, 1500);
+          } else if (response.status === 409) {
+            setStatus('User already exists! Redirecting to dashboard...');
+            setTimeout(() => {
+              window.location.href = '/dashboard';
+            }, 1000);
           } else {
             const errorData = await response.json();
             throw new Error(errorData.error || 'Failed to create user in database');
@@ -60,6 +70,7 @@ function AuthCallback() {
       } catch (error) {
         console.error('Error processing authentication:', error);
         setStatus(`Authentication failed: ${error.message}`);
+        hasProcessed.current = false;
       }
     };
 
