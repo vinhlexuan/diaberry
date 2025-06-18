@@ -8,6 +8,7 @@ dotenv.config();
 import { User } from "../entities/User";
 import { Diary } from "../entities/Diary";
 import { DiaryShare } from "../entities/DiaryShare";
+import { Session } from "../entities/Session";
 
 const AppDataSource = new DataSource({
 	type: "postgres",
@@ -18,7 +19,7 @@ const AppDataSource = new DataSource({
 	schema: "diaberry",
 	synchronize: false, // Set to true for development only
 	logging: process.env.NODE_ENV !== 'production',
-	entities: [User, Diary, DiaryShare],
+	entities: [User, Diary, DiaryShare, Session],
 	migrations: [path.join(__dirname, "../migrations/*.{js,ts}")],
 	subscribers: [path.join(__dirname, "../subscribers/*.{js,ts}")],
 });

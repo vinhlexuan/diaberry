@@ -1,9 +1,10 @@
-import "reflect-metadata"; // This must be the first import
+import "reflect-metadata";
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
+import diaryRoutes from './routes/diaryRoutes';
 import { initializeDatabase } from './config/database';
 
 dotenv.config();
@@ -18,6 +19,7 @@ app.use(express.json());
 // Routes
 app.use('/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/diaries', diaryRoutes);
 
 // Simple test route
 app.get('/', (req: Request, res: Response) => {

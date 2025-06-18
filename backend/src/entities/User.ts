@@ -6,9 +6,10 @@ import {
   UpdateDateColumn,
   BeforeInsert,
   BeforeUpdate,
-	OneToMany,
+  OneToMany
 } from "typeorm";
 import { Diary } from "./Diary";
+import { Session } from "./Session";
 
 
 @Entity("user", { schema: "diaberry" })
@@ -28,7 +29,7 @@ export class User {
   @Column({ nullable: true })
   last_name?: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   google_id?: string;
 
   @Column({ nullable: true })
@@ -43,11 +44,14 @@ export class User {
   @UpdateDateColumn({ name: "updated_at" })
   updated_at!: Date;
 
-	@OneToMany(() => Diary, (diary) => diary.user, {
-		eager: true, // Automatically loads diaries when fetching a user
-		cascade: ["remove"], // Cascade delete diaries when a user is deleted
-	})
-	diaries!: Diary[];
+  @OneToMany(() => Session, session => session.user)
+  sessions!: Session[];
+
+  @OneToMany(() => Diary, diary => diary.user, {
+    eager: true,
+    cascade: ["remove"], // Automatically save diaries when user is saved
+  })
+  diaries!: Diary[];
 
   @BeforeInsert()
   @BeforeUpdate()
@@ -57,9 +61,7 @@ export class User {
     }
   }
 
-  // Helper method to sanitize user object (remove sensitive data)
   toJSON() {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password_hash, ...userWithoutPassword } = this;
     return userWithoutPassword;
   }
