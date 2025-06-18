@@ -20,35 +20,26 @@ function Dashboard() {
   const fetchDiaries = async () => {
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      if (!user.id) return;
+      if (!user.id) {
+        setLoading(false);
+        return;
+      }
 
-      // TODO: Replace with actual API call
-      // const response = await fetch(`http://localhost:8080/api/diaries/user/${user.id}`);
-      // const data = await response.json();
+      const response = await fetch(`http://localhost:8080/api/diaries/user/${user.id}`);
+      const data = await response.json();
       
-      // Mock data for now
-      const mockDiaries = [
-        {
-          id: 1,
-          date: new Date(2024, 0, 15),
-          content: "Today was a good day. My blood sugar levels were stable throughout the day. Had a healthy breakfast with oatmeal and berries.",
-          created_at: new Date(2024, 0, 15)
-        },
-        {
-          id: 2,
-          date: new Date(2024, 0, 16),
-          content: "Went for a 30-minute walk after lunch. Feeling energetic and positive. Blood sugar spike after dinner - need to be more careful with portion sizes.",
-          created_at: new Date(2024, 0, 16)
-        },
-        {
-          id: 3,
-          date: new Date(),
-          content: "Started the day with meditation. Blood sugar readings are improving. Planning to meal prep for the week.",
-          created_at: new Date()
-        }
-      ];
-
-      setDiaries(mockDiaries);
+      if (data.success) {
+        // Convert date strings to Date objects
+        const formattedDiaries = data.data.map(diary => ({
+          ...diary,
+          date: new Date(diary.date),
+          created_at: new Date(diary.created_at)
+        }));
+        setDiaries(formattedDiaries);
+      } else {
+        console.error('Failed to fetch diaries:', data.error);
+      }
+      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching diaries:', error);
@@ -82,31 +73,103 @@ function Dashboard() {
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       
-      // TODO: Replace with actual API call
-      // const response = await fetch('http://localhost:8080/api/diaries', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     user_id: user.id,
-      //     date: selectedDate,
-      //     content: newDiaryContent
-      //   })
-      // });
+      const response = await fetch('http://localhost:8080/api/diaries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          date: selectedDate.toISOString(),
+          content: newDiaryContent
+        })
+      });
 
-      // Mock creation for now
-      const newDiary = {
-        id: Date.now(),
-        date: selectedDate,
-        content: newDiaryContent,
-        created_at: new Date()
-      };
+      const data = await response.json();
 
-      setDiaries([...diaries, newDiary]);
-      setSelectedDiary(newDiary);
-      setNewDiaryContent('');
-      setShowNewDiaryModal(false);
+      if (response.ok && data.success) {
+        // Convert date string to Date object
+        const newDiary = {
+          ...data.data,
+          date: new Date(data.data.date),
+          created_at: new Date(data.data.created_at)
+        };
+
+        setDiaries([...diaries, newDiary]);
+        setSelectedDiary(newDiary);
+        setNewDiaryContent('');
+        setShowNewDiaryModal(false);
+      } else {
+        console.error('Failed to create diary:', data.error);
+        alert(data.error || 'Failed to create diary entry');
+      }
     } catch (error) {
       console.error('Error creating diary:', error);
+      alert('Failed to create diary entry');
+    }
+  };
+
+  const handleEditDiary = async (diaryId, newContent) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/diaries/${diaryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: newContent
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Update the diary in the list
+        const updatedDiaries = diaries.map(diary => 
+          diary.id === diaryId 
+            ? { ...diary, content: newContent, updated_at: new Date() }
+            : diary
+        );
+        setDiaries(updatedDiaries);
+        
+        // Update selected diary if it's the one being edited
+        if (selectedDiary && selectedDiary.id === diaryId) {
+          setSelectedDiary({ ...selectedDiary, content: newContent });
+        }
+      } else {
+        console.error('Failed to update diary:', data.error);
+        alert(data.error || 'Failed to update diary entry');
+      }
+    } catch (error) {
+      console.error('Error updating diary:', error);
+      alert('Failed to update diary entry');
+    }
+  };
+
+  const handleDeleteDiary = async (diaryId) => {
+    if (!confirm('Are you sure you want to delete this diary entry?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:8080/api/diaries/${diaryId}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Remove diary from the list
+        const updatedDiaries = diaries.filter(diary => diary.id !== diaryId);
+        setDiaries(updatedDiaries);
+        
+        // Clear selected diary if it's the one being deleted
+        if (selectedDiary && selectedDiary.id === diaryId) {
+          setSelectedDiary(null);
+        }
+      } else {
+        console.error('Failed to delete diary:', data.error);
+        alert(data.error || 'Failed to delete diary entry');
+      }
+    } catch (error) {
+      console.error('Error deleting diary:', error);
+      alert('Failed to delete diary entry');
     }
   };
 
@@ -181,8 +244,23 @@ function Dashboard() {
                     {selectedDiary.content}
                   </div>
                   <div className="diary-actions">
-                    <button className="edit-btn">Edit</button>
-                    <button className="delete-btn">Delete</button>
+                    <button 
+                      className="edit-btn"
+                      onClick={() => {
+                        const newContent = prompt('Edit your diary entry:', selectedDiary.content);
+                        if (newContent && newContent.trim() !== selectedDiary.content) {
+                          handleEditDiary(selectedDiary.id, newContent.trim());
+                        }
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      className="delete-btn"
+                      onClick={() => handleDeleteDiary(selectedDiary.id)}
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ) : (
