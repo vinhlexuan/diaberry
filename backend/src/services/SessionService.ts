@@ -1,7 +1,7 @@
-import { getSessionRepository } from '../repositories/SessionRepository';
-import { getUserRepository } from '../repositories/UserRepository';
-import { Session } from '../entities/Session';
-import { User } from '../entities/User';
+import { getSessionRepository } from '../repositories/sessionRepository';
+import { getUserRepository } from '../repositories/userRepository';
+import { Session } from '../entities/session';
+import { User } from '../entities/user';
 
 export class SessionService {
   async createSession(userData: {

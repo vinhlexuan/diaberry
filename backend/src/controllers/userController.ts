@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getUserRepository } from '../repositories/UserRepository';
+import { getUserRepository } from '../repositories/userRepository';
 
 /**
  * Get all users

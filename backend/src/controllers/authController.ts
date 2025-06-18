@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getSessionService } from '../services/SessionService';
+import { getSessionService } from '../services/sessionService';
 
 export const handleGoogleSignIn = (req: Request, res: Response): void => {
   const supabaseUrl = process.env.SUPABASE_URL || '';

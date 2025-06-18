@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getSessionService } from '../services/SessionService';
+import { getSessionService } from '../services/sessionService';
 
 // Extend Request interface to include user
 declare global {

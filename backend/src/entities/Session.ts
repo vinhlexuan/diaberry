@@ -8,7 +8,7 @@ import {
   JoinColumn,
   Index
 } from "typeorm";
-import { User } from "./User";
+import { User } from "./user";
 
 @Entity("session", { schema: "diaberry" })
 @Index("IDX_SESSION_TOKEN", ["token"], { unique: true })

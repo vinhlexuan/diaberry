@@ -5,10 +5,10 @@ import path from 'path';
 dotenv.config();
 
 // Entities
-import { User } from "../entities/User";
-import { Diary } from "../entities/Diary";
-import { DiaryShare } from "../entities/DiaryShare";
-import { Session } from "../entities/Session";
+import { User } from "../entities/user";
+import { Diary } from "../entities/diary";
+import { DiaryShare } from "../entities/diaryShare";
+import { Session } from "../entities/session";
 
 const AppDataSource = new DataSource({
 	type: "postgres",

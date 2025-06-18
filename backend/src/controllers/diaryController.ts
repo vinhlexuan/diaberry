@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { getDiaryRepository } from '../repositories/DiaryRepository';
-import { getUserRepository } from '../repositories/UserRepository';
+import { getUserRepository } from '../repositories/userRepository';
 
 /**
  * Get all diaries for a specific user

@@ -7,8 +7,8 @@ import {
     ManyToOne,
     JoinColumn,
   } from "typeorm";
-import { User } from "./User";
-import { Diary } from "./Diary";
+import { User } from "./user";
+import { Diary } from "./diary";
 
 @Entity("diary_share")
 export class DiaryShare {

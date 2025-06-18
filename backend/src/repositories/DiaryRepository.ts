@@ -1,6 +1,6 @@
 import { Repository } from "typeorm";
-import { Diary } from "../entities/Diary";
-import { User } from "../entities/User";
+import { Diary } from "../entities/diary";
+import { User } from "../entities/user";
 import AppDataSource from "../config/database";
 
 export class DiaryRepository {

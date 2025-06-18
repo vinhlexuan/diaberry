@@ -1,6 +1,6 @@
 import { Repository } from "typeorm";
-import { Session } from "../entities/Session";
-import { User } from "../entities/User";
+import { Session } from "../entities/session";
+import { User } from "../entities/user";
 import AppDataSource from "../config/database";
 import crypto from 'crypto';
 

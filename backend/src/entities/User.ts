@@ -8,8 +8,8 @@ import {
   BeforeUpdate,
   OneToMany
 } from "typeorm";
-import { Diary } from "./Diary";
-import { Session } from "./Session";
+import { Diary } from "./diary";
+import { Session } from "./session";
 
 
 @Entity("user", { schema: "diaberry" })
