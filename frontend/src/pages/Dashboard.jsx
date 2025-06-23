@@ -1,74 +1,137 @@
-import { useState, useEffect } from 'react';
-import Calendar from 'react-calendar';
-import Header from '../components/Header.jsx';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Box,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  CircularProgress,
+  useTheme,
+  useMediaQuery,
+  Paper,
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  MenuBook,
+  CalendarToday,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Close as CloseIcon,
+  FiberManualRecord,
+} from '@mui/icons-material';
+import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
+import { PickersDay } from '@mui/x-date-pickers/PickersDay';
+import dayjs from 'dayjs';
+import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { Plus, BookOpen, Calendar as CalendarIcon } from 'lucide-react';
-import '../styles/Dashboard.css';
-import 'react-calendar/dist/Calendar.css';
 
 function Dashboard() {
   const { user, authenticatedFetch } = useAuth();
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(dayjs());
   const [diaries, setDiaries] = useState([]);
   const [selectedDiary, setSelectedDiary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showNewDiaryModal, setShowNewDiaryModal] = useState(false);
   const [newDiaryContent, setNewDiaryContent] = useState('');
+  const [editingDiary, setEditingDiary] = useState(null);
+  const [editContent, setEditContent] = useState('');
+  
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
+  // Use refs to prevent duplicate API calls
+  const isFetching = useRef(false);
+  const hasInitialized = useRef(false);
 
-  useEffect(() => {
-    if (user) {
-      fetchDiaries();
+  const fetchDiaries = useCallback(async () => {
+    // Prevent multiple simultaneous fetches
+    if (isFetching.current || !user?.id) {
+      return;
     }
-  }, [user]);
 
-  const fetchDiaries = async () => {
+    isFetching.current = true;
+    setLoading(true);
+
     try {
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
-
-      // Updated API call - no user ID in URL
       const response = await authenticatedFetch(`http://localhost:8080/api/diaries`);
       const data = await response.json();
       
       if (data.success) {
-        // Convert date strings to Date objects
         const formattedDiaries = data.data.map(diary => ({
           ...diary,
-          date: new Date(diary.date),
-          created_at: new Date(diary.created_at)
+          date: dayjs(diary.date),
+          created_at: dayjs(diary.created_at)
         }));
         setDiaries(formattedDiaries);
       } else {
         console.error('Failed to fetch diaries:', data.error);
       }
-      
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching diaries:', error);
+    } finally {
       setLoading(false);
+      isFetching.current = false;
     }
-  };
+  }, [user?.id, authenticatedFetch]);
 
-  const handleDateChange = (date) => {
-    setSelectedDate(date);
+  // Initialize only once when user is available
+  useEffect(() => {
+    if (user?.id && !hasInitialized.current) {
+      hasInitialized.current = true;
+      fetchDiaries();
+    }
+  }, [user?.id, fetchDiaries]);
+
+  useEffect(() => {
+    // Update selected diary when date changes
     const diary = diaries.find(d => 
-      d.date.toDateString() === date.toDateString()
+      dayjs(d.date).format('YYYY-MM-DD') === selectedDate.format('YYYY-MM-DD')
     );
     setSelectedDiary(diary || null);
-  };
+  }, [selectedDate, diaries]);
 
-  const tileContent = ({ date, view }) => {
-    if (view === 'month') {
-      const hasDiary = diaries.some(diary => 
-        diary.date.toDateString() === date.toDateString()
-      );
-      if (hasDiary) {
-        return <div className="diary-indicator"></div>;
-      }
-    }
-    return null;
+  const CustomPickersDay = (props) => {
+    const { day, outsideCurrentMonth, ...other } = props;
+    
+    const hasDiary = diaries.some(diary => 
+      diary.date.format('YYYY-MM-DD') === day.format('YYYY-MM-DD')
+    );
+
+    return (
+      <Box sx={{ position: 'relative' }}>
+        <PickersDay
+          {...other}
+          day={day}
+          outsideCurrentMonth={outsideCurrentMonth}
+          sx={{
+            position: 'relative',
+            ...(hasDiary && {
+              backgroundColor: 'action.hover',
+              '&:hover': {
+                backgroundColor: 'action.selected',
+              },
+            }),
+          }}
+        />
+        {hasDiary && (
+          <FiberManualRecord
+            sx={{
+              position: 'absolute',
+              bottom: 2,
+              right: 2,
+              fontSize: 8,
+              color: 'secondary.main',
+            }}
+          />
+        )}
+      </Box>
+    );
   };
 
   const handleCreateDiary = async () => {
@@ -81,74 +144,66 @@ function Dashboard() {
         body: JSON.stringify({
           date: selectedDate.toISOString(),
           content: newDiaryContent
-          // No user_id needed - comes from token
         })
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Convert date string to Date object
         const newDiary = {
           ...data.data,
-          date: new Date(data.data.date),
-          created_at: new Date(data.data.created_at)
+          date: dayjs(data.data.date),
+          created_at: dayjs(data.data.created_at)
         };
 
-        setDiaries([...diaries, newDiary]);
+        setDiaries(prev => [...prev, newDiary]);
         setSelectedDiary(newDiary);
         setNewDiaryContent('');
         setShowNewDiaryModal(false);
       } else {
         console.error('Failed to create diary:', data.error);
-        alert(data.error || 'Failed to create diary entry');
       }
     } catch (error) {
       console.error('Error creating diary:', error);
-      alert('Failed to create diary entry');
     }
   };
 
-  const handleEditDiary = async (diaryId, newContent) => {
+  const handleEditDiary = async () => {
+    if (!editContent.trim() || !editingDiary) return;
+
     try {
-      const response = await authenticatedFetch(`http://localhost:8080/api/diaries/${diaryId}`, {
+      const response = await authenticatedFetch(`http://localhost:8080/api/diaries/${editingDiary.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: newContent
+          content: editContent
         })
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Update the diary in the list
-        const updatedDiaries = diaries.map(diary => 
-          diary.id === diaryId 
-            ? { ...diary, content: newContent, updated_at: new Date() }
+        setDiaries(prev => prev.map(diary => 
+          diary.id === editingDiary.id 
+            ? { ...diary, content: editContent, updated_at: dayjs() }
             : diary
-        );
-        setDiaries(updatedDiaries);
+        ));
         
-        // Update selected diary if it's the one being edited
-        if (selectedDiary && selectedDiary.id === diaryId) {
-          setSelectedDiary({ ...selectedDiary, content: newContent });
+        if (selectedDiary && selectedDiary.id === editingDiary.id) {
+          setSelectedDiary(prev => ({ ...prev, content: editContent }));
         }
+        
+        setEditingDiary(null);
+        setEditContent('');
       } else {
         console.error('Failed to update diary:', data.error);
-        alert(data.error || 'Failed to update diary entry');
       }
     } catch (error) {
       console.error('Error updating diary:', error);
-      alert('Failed to update diary entry');
     }
   };
 
   const handleDeleteDiary = async (diaryId) => {
-    if (!confirm('Are you sure you want to delete this diary entry?')) {
-      return;
-    }
-
     try {
       const response = await authenticatedFetch(`http://localhost:8080/api/diaries/${diaryId}`, {
         method: 'DELETE'
@@ -157,174 +212,345 @@ function Dashboard() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Remove diary from the list
-        const updatedDiaries = diaries.filter(diary => diary.id !== diaryId);
-        setDiaries(updatedDiaries);
+        setDiaries(prev => prev.filter(diary => diary.id !== diaryId));
         
-        // Clear selected diary if it's the one being deleted
         if (selectedDiary && selectedDiary.id === diaryId) {
           setSelectedDiary(null);
         }
       } else {
         console.error('Failed to delete diary:', data.error);
-        alert(data.error || 'Failed to delete diary entry');
       }
     } catch (error) {
       console.error('Error deleting diary:', error);
-      alert('Failed to delete diary entry');
     }
+  };
+
+  const startEdit = (diary) => {
+    setEditingDiary(diary);
+    setEditContent(diary.content);
   };
 
   if (loading) {
     return (
-      <div className="dashboard-loading">
-        <Header />
-        <div className="loading-spinner">Loading your diaries...</div>
-      </div>
+      <Layout>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+          <CircularProgress />
+          <Typography variant="h6" sx={{ ml: 2 }}>
+            Loading your diaries...
+          </Typography>
+        </Box>
+      </Layout>
     );
   }
 
   return (
-    <div className="dashboard">
-      <Header />
-      
-      <div className="dashboard-container">
-        <div className="dashboard-header">
-          <h2>Personal Diary Calendar</h2>
-          <p>Track your daily experiences and health journey</p>
-        </div>
-
-        <div className="dashboard-content">
-          <div className="calendar-section">
-            <div className="calendar-wrapper">
-              <Calendar
-                onChange={handleDateChange}
+    <Layout>
+      {/* Main Content with Fixed Widths - No Header */}
+      <Box sx={{ 
+        display: 'flex', 
+        gap: 3,
+        height: 'calc(100vh - 200px)', // Adjusted height since no header
+        minHeight: '600px',
+        // Stack vertically on mobile
+        flexDirection: { xs: 'column', md: 'row' },
+      }}>
+        {/* Calendar Section - Fixed 20% width on desktop */}
+        <Box sx={{ 
+          width: { xs: '100%', md: '20%' },
+          minWidth: { md: '300px' }, // Minimum width to keep calendar usable
+          flexShrink: 0,
+        }}>
+          <Card sx={{ 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column',
+          }}>
+            <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <DateCalendar
                 value={selectedDate}
-                tileContent={tileContent}
-                className="custom-calendar"
+                onChange={(newValue) => setSelectedDate(newValue)}
+                slots={{
+                  day: CustomPickersDay,
+                }}
+                // Fix calendar year selection by adding min/max dates
+                minDate={dayjs('2000-01-01')}
+                maxDate={dayjs('2099-12-31')}
+                views={['year', 'month', 'day']}
+                openTo="day"
+                sx={{
+                  width: '100%',
+                  flex: 1,
+                  '& .MuiPickersCalendarHeader-root': {
+                    paddingLeft: 1,
+                    paddingRight: 1,
+                  },
+                  // Make calendar responsive within fixed width
+                  '& .MuiDayCalendar-root': {
+                    width: '100%',
+                  },
+                  '& .MuiPickersDay-root': {
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    width: { xs: '28px', sm: '36px' },
+                    height: { xs: '28px', sm: '36px' },
+                  },
+                  // Fix year selection view styling
+                  '& .MuiYearCalendar-root': {
+                    width: '100%',
+                    height: 'auto',
+                  },
+                  '& .MuiPickersYear-yearButton': {
+                    fontSize: '0.875rem',
+                    margin: '2px',
+                  },
+                  // Fix month selection view styling
+                  '& .MuiMonthCalendar-root': {
+                    width: '100%',
+                    height: 'auto',
+                  },
+                  '& .MuiPickersMonth-monthButton': {
+                    fontSize: '0.875rem',
+                    margin: '4px',
+                  },
+                }}
               />
-            </div>
-            
-            <div className="calendar-legend">
-              <div className="legend-item">
-                <div className="diary-indicator"></div>
-              </div>
-            </div>
-          </div>
+              
+              {/* Legend */}
+              <Box sx={{ 
+                mt: 2, 
+                pt: 2, 
+                borderTop: '1px solid', 
+                borderColor: 'divider',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                flexShrink: 0,
+              }}>
+                <FiberManualRecord sx={{ fontSize: 12, color: 'secondary.main' }} />
+                <Typography variant="body2" color="text.secondary">
+                  Has diary entry
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
 
-          <div className="diary-section">
-            <div className="diary-header">
-              <h3>
-                <CalendarIcon size={20} />
-                {selectedDate.toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </h3>
-              {!selectedDiary && (
-                <button 
-                  className="add-diary-btn"
-                  onClick={() => setShowNewDiaryModal(true)}
-                >
-                  <Plus size={16} />
-                  Add Entry
-                </button>
-              )}
-            </div>
+        {/* Diary Section - Fixed 70% width on desktop */}
+        <Box sx={{ 
+          width: { xs: '100%', md: '70%' },
+          flexShrink: 0,
+        }}>
+          <Card sx={{ 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column',
+          }}>
+            <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              {/* Diary Header */}
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'flex-start',
+                mb: 2,
+                flexWrap: 'wrap',
+                gap: 2,
+                flexShrink: 0,
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
+                  <CalendarToday color="primary" />
+                  <Typography variant="h6" component="h2" noWrap>
+                    {selectedDate.format('dddd, MMMM D, YYYY')}
+                  </Typography>
+                </Box>
+                
+                {!selectedDiary && (
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => setShowNewDiaryModal(true)}
+                    size={isMobile ? 'small' : 'medium'}
+                    sx={{ flexShrink: 0 }}
+                  >
+                    Add Entry
+                  </Button>
+                )}
+              </Box>
 
-            <div className="diary-content">
-              {selectedDiary ? (
-                <div className="diary-entry">
-                  <div className="diary-meta">
-                    <BookOpen size={16} />
-                    <span>Created: {selectedDiary.created_at.toLocaleString()}</span>
-                  </div>
-                  <div className="diary-text">
-                    {selectedDiary.content}
-                  </div>
-                  <div className="diary-actions">
-                    <button 
-                      className="edit-btn"
-                      onClick={() => {
-                        const newContent = prompt('Edit your diary entry:', selectedDiary.content);
-                        if (newContent && newContent.trim() !== selectedDiary.content) {
-                          handleEditDiary(selectedDiary.id, newContent.trim());
-                        }
+              {/* Diary Content - Expandable area */}
+              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                {selectedDiary ? (
+                  <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexShrink: 0 }}>
+                      <MenuBook fontSize="small" color="action" />
+                      <Typography variant="body2" color="text.secondary">
+                        Created: {selectedDiary.created_at.format('MMM D, YYYY [at] h:mm A')}
+                      </Typography>
+                    </Box>
+                    
+                    <Paper 
+                      variant="outlined" 
+                      sx={{ 
+                        p: 2, 
+                        mb: 2, 
+                        backgroundColor: 'grey.50',
+                        borderRadius: 2,
+                        flex: 1,
+                        overflow: 'auto',
+                        display: 'flex',
+                        flexDirection: 'column',
                       }}
                     >
-                      Edit
-                    </button>
-                    <button 
-                      className="delete-btn"
-                      onClick={() => handleDeleteDiary(selectedDiary.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="no-diary">
-                  <BookOpen size={48} />
-                  <h4>No diary entry for this date</h4>
-                  <p>Click "Add Entry" to create your first diary entry for this day.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+                      <Typography 
+                        variant="body1" 
+                        sx={{ 
+                          lineHeight: 1.6, 
+                          whiteSpace: 'pre-wrap',
+                          overflow: 'auto',
+                          flex: 1,
+                        }}
+                      >
+                        {selectedDiary.content}
+                      </Typography>
+                    </Paper>
+                    
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', flexShrink: 0 }}>
+                      <Button
+                        variant="outlined"
+                        startIcon={<EditIcon />}
+                        onClick={() => startEdit(selectedDiary)}
+                        size="small"
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to delete this diary entry?')) {
+                            handleDeleteDiary(selectedDiary.id);
+                          }
+                        }}
+                        size="small"
+                      >
+                        Delete
+                      </Button>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box sx={{ 
+                    flex: 1, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    textAlign: 'center', 
+                    py: 4 
+                  }}>
+                    <Box>
+                      <MenuBook sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                      <Typography variant="h6" gutterBottom color="text.secondary">
+                        No diary entry for this date
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Click "Add Entry" to create your first diary entry for this day.
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+      </Box>
 
       {/* New Diary Modal */}
-      {showNewDiaryModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>New Diary Entry</h3>
-              <button 
-                className="close-btn"
-                onClick={() => setShowNewDiaryModal(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-content">
-              <p>
-                {selectedDate.toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </p>
-              <textarea
-                value={newDiaryContent}
-                onChange={(e) => setNewDiaryContent(e.target.value)}
-                placeholder="Write about your day, feelings, health observations..."
-                rows={8}
-                className="diary-textarea"
-              />
-            </div>
-            <div className="modal-actions">
-              <button 
-                className="cancel-btn"
-                onClick={() => setShowNewDiaryModal(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="save-btn"
-                onClick={handleCreateDiary}
-                disabled={!newDiaryContent.trim()}
-              >
-                Save Entry
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <Dialog 
+        open={showNewDiaryModal} 
+        onClose={() => setShowNewDiaryModal(false)}
+        maxWidth="sm"
+        fullWidth
+        fullScreen={isMobile}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">New Diary Entry</Typography>
+          <IconButton onClick={() => setShowNewDiaryModal(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            {selectedDate.format('dddd, MMMM D, YYYY')}
+          </Typography>
+          <TextField
+            autoFocus
+            margin="dense"
+            fullWidth
+            multiline
+            rows={8}
+            variant="outlined"
+            placeholder="Write about your day, feelings, health observations..."
+            value={newDiaryContent}
+            onChange={(e) => setNewDiaryContent(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setShowNewDiaryModal(false)}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained"
+            onClick={handleCreateDiary}
+            disabled={!newDiaryContent.trim()}
+          >
+            Save Entry
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Diary Modal */}
+      <Dialog 
+        open={Boolean(editingDiary)} 
+        onClose={() => setEditingDiary(null)}
+        maxWidth="sm"
+        fullWidth
+        fullScreen={isMobile}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">Edit Diary Entry</Typography>
+          <IconButton onClick={() => setEditingDiary(null)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            {editingDiary?.date.format('dddd, MMMM D, YYYY')}
+          </Typography>
+          <TextField
+            autoFocus
+            margin="dense"
+            fullWidth
+            multiline
+            rows={8}
+            variant="outlined"
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setEditingDiary(null)}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained"
+            onClick={handleEditDiary}
+            disabled={!editContent.trim()}
+          >
+            Update Entry
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Layout>
   );
 }
 

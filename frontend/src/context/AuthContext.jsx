@@ -15,16 +15,25 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sessionToken, setSessionToken] = useState(null);
+  const [hasCheckedSession, setHasCheckedSession] = useState(false);
 
   useEffect(() => {
-    checkExistingSession();
+    if (!hasCheckedSession) {
+      checkExistingSession();
+    }
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session);
         
+        // Only handle auth state changes after initial session check is complete
+        if (!hasCheckedSession) return;
+        
         if (event === 'SIGNED_IN' && session) {
-          await handleUserSession(session);
+          // Only process if we don't already have a session
+          if (!sessionToken && !user) {
+            await handleUserSession(session);
+          }
         } else if (event === 'SIGNED_OUT') {
           handleSignOut();
         }
@@ -32,7 +41,7 @@ export const AuthProvider = ({ children }) => {
     );
 
     return () => subscription?.unsubscribe();
-  }, []);
+  }, [hasCheckedSession, sessionToken, user]);
 
   const checkExistingSession = async () => {
     try {
@@ -64,10 +73,12 @@ export const AuthProvider = ({ children }) => {
           }
         }
       } else {
-        // Check if there's a Supabase session
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await handleUserSession(session);
+        // Only check Supabase session if we're on callback page
+        if (window.location.pathname === '/callback') {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session && !sessionToken && !user) {
+            await handleUserSession(session);
+          }
         }
       }
     } catch (error) {
@@ -75,6 +86,7 @@ export const AuthProvider = ({ children }) => {
       clearStoredAuth();
     } finally {
       setLoading(false);
+      setHasCheckedSession(true);
     }
   };
 
@@ -93,6 +105,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('session_token', data.session.token);
         localStorage.setItem('refresh_token', data.session.refresh_token);
         setSessionToken(data.session.token);
+        setUser(JSON.parse(localStorage.getItem('user')));
         return true;
       }
     } catch (error) {
@@ -105,30 +118,12 @@ export const AuthProvider = ({ children }) => {
 
   const handleUserSession = async (supabaseSession) => {
     try {
-      // Check if we already have this user session stored
-      const storedUser = localStorage.getItem('user');
-      const storedToken = localStorage.getItem('session_token');
-      
-      if (storedUser && storedToken) {
-        // Validate existing session first
-        const response = await fetch('http://localhost:8080/auth/validate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token: storedToken })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.user);
-          setSessionToken(storedToken);
-          console.log('Existing session validated:', data.user);
-          return; // Don't create a new session
-        }
+      // Skip if we already have a session
+      if (sessionToken && user) {
+        console.log('Session already exists, skipping');
+        return;
       }
 
-      // Only create new session if no valid session exists
       const supabaseUser = supabaseSession.user;
       
       const userData = {
@@ -140,6 +135,8 @@ export const AuthProvider = ({ children }) => {
                   supabaseUser.user_metadata?.full_name?.split(' ').slice(1).join(' ') || '',
         avatar_url: supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture
       };
+
+      console.log('Creating new session for user:', userData);
 
       const response = await fetch('http://localhost:8080/auth/google/user', {
         method: 'POST',
@@ -157,10 +154,18 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('session_token', result.session.token);
         localStorage.setItem('refresh_token', result.session.refresh_token);
         
+        // Set user state first, then redirect after a small delay
         setUser(result.user);
         setSessionToken(result.session.token);
         
         console.log('New user session created:', result.user);
+        
+        // Delay redirect to ensure state is updated
+        setTimeout(() => {
+          if (window.location.pathname === '/callback') {
+            window.location.href = '/dashboard';
+          }
+        }, 100);
       } else {
         throw new Error('Failed to create user session');
       }
@@ -203,9 +208,13 @@ export const AuthProvider = ({ children }) => {
       await supabase.auth.signOut();
       
       handleSignOut();
+      
+      // Redirect to login page after sign out
+      window.location.href = '/login';
     } catch (error) {
       console.error('Error signing out:', error);
       handleSignOut();
+      window.location.href = '/login';
     }
   };
 
@@ -213,6 +222,7 @@ export const AuthProvider = ({ children }) => {
     clearStoredAuth();
     setUser(null);
     setSessionToken(null);
+    setHasCheckedSession(false);
   };
 
   const clearStoredAuth = () => {
