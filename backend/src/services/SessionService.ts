@@ -32,6 +32,17 @@ export class SessionService {
         provider: 'google'
       });
       user = updatedUser!;
+
+      // Check if user already has an active session
+			const existingSessions = await sessionRepository.findByUserId(user.id);
+			if (existingSessions.length > 0) {
+				// Return the most recent valid session
+				const validSession = existingSessions.find(s => s.isValid());
+				if (validSession) {
+						console.log('Using existing valid session for user:', user.id);
+						return { user, session: validSession };
+				}
+			}
     } else {
       // Create new user
       user = await userRepository.create({

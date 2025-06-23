@@ -1,33 +1,26 @@
 import { Request, Response } from 'express';
-import { getDiaryRepository } from '../repositories/DiaryRepository';
-import { getUserRepository } from '../repositories/userRepository';
+import { getDiaryRepository } from '../repositories/diaryRepository';
+import { requireAuthFromRequest } from '../middlewares/auth';
 
 /**
- * Get all diaries for a specific user
+ * Get all diaries for authenticated user
  */
 export const getUserDiaries = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = parseInt(req.params.userId, 10);
+    const { user } = requireAuthFromRequest(req);
     
-    if (isNaN(userId)) {
-      res.status(400).json({ error: 'Invalid user ID' });
-      return;
-    }
-
-    // Check if authenticated user is requesting their own diaries
-    if (req.user && req.user.id !== userId) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
-
     const diaryRepository = getDiaryRepository();
-    const diaries = await diaryRepository.findByUserId(userId);
+    const diaries = await diaryRepository.findByUserId(user.id);
     
     res.json({
       success: true,
       data: diaries
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Authentication required') {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     console.error('Error fetching user diaries:', error);
     res.status(500).json({ error: 'Failed to fetch diaries' });
   }
@@ -38,8 +31,15 @@ export const getUserDiaries = async (req: Request, res: Response): Promise<void>
  */
 export const getDiaryById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const { user } = requireAuthFromRequest(req);
     
+    const idParam = req.params.id;
+    if (!idParam) {
+      res.status(400).json({ error: 'Diary ID is required' });
+      return;
+    }
+
+    const id = parseInt(idParam, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid diary ID' });
       return;
@@ -53,8 +53,8 @@ export const getDiaryById = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // Check if authenticated user owns this diary
-    if (req.user && req.user.id !== diary.user.id) {
+    // Check ownership
+    if (diary.user.id !== user.id) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -64,6 +64,10 @@ export const getDiaryById = async (req: Request, res: Response): Promise<void> =
       data: diary
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Authentication required') {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     console.error('Error fetching diary:', error);
     res.status(500).json({ error: 'Failed to fetch diary' });
   }
@@ -74,27 +78,15 @@ export const getDiaryById = async (req: Request, res: Response): Promise<void> =
  */
 export const createDiary = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { date, content, user_id } = req.body;
+    const { user } = requireAuthFromRequest(req);
+    
+    const { date, content } = req.body;
 
     // Validation
-    if (!date || !content || !user_id) {
+    if (!date || !content) {
       res.status(400).json({ 
-        error: 'Date, content, and user_id are required' 
+        error: 'Date and content are required' 
       });
-      return;
-    }
-
-    // Check if authenticated user is creating their own diary
-    if (req.user && req.user.id !== user_id) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
-
-    // Check if user exists
-    const userRepository = getUserRepository();
-    const user = await userRepository.findById(user_id);
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
       return;
     }
 
@@ -107,7 +99,7 @@ export const createDiary = async (req: Request, res: Response): Promise<void> =>
 
     // Check if diary already exists for this user and date
     const diaryRepository = getDiaryRepository();
-    const existingDiary = await diaryRepository.findByUserIdAndDate(user_id, diaryDate);
+    const existingDiary = await diaryRepository.findByUserIdAndDate(user.id, diaryDate);
     
     if (existingDiary) {
       res.status(409).json({ 
@@ -121,7 +113,7 @@ export const createDiary = async (req: Request, res: Response): Promise<void> =>
     const newDiary = await diaryRepository.create({
       date: diaryDate,
       content: content.trim(),
-      userId: user_id
+      userId: user.id
     });
 
     res.status(201).json({
@@ -130,6 +122,10 @@ export const createDiary = async (req: Request, res: Response): Promise<void> =>
       data: newDiary
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Authentication required') {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     console.error('Error creating diary:', error);
     res.status(500).json({ error: 'Failed to create diary' });
   }
@@ -140,19 +136,41 @@ export const createDiary = async (req: Request, res: Response): Promise<void> =>
  */
 export const updateDiary = async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id, 10);
-    const { date, content } = req.body;
+    const { user } = requireAuthFromRequest(req);
+    
+    const idParam = req.params.id;
+    if (!idParam) {
+      res.status(400).json({ error: 'Diary ID is required' });
+      return;
+    }
 
+    const id = parseInt(idParam, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid diary ID' });
       return;
     }
+
+    const { date, content } = req.body;
 
     // Validation
     if (!date && !content) {
       res.status(400).json({ 
         error: 'At least one field (date or content) is required for update' 
       });
+      return;
+    }
+
+    const diaryRepository = getDiaryRepository();
+    
+    // Check if diary exists and user owns it
+    const existingDiary = await diaryRepository.findById(id);
+    if (!existingDiary) {
+      res.status(404).json({ error: 'Diary not found' });
+      return;
+    }
+
+    if (existingDiary.user.id !== user.id) {
+      res.status(403).json({ error: 'Access denied' });
       return;
     }
 
@@ -171,13 +189,7 @@ export const updateDiary = async (req: Request, res: Response): Promise<void> =>
       updateData.content = content.trim();
     }
 
-    const diaryRepository = getDiaryRepository();
     const updatedDiary = await diaryRepository.update(id, updateData);
-
-    if (!updatedDiary) {
-      res.status(404).json({ error: 'Diary not found' });
-      return;
-    }
 
     res.json({
       success: true,
@@ -185,6 +197,10 @@ export const updateDiary = async (req: Request, res: Response): Promise<void> =>
       data: updatedDiary
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Authentication required') {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     console.error('Error updating diary:', error);
     res.status(500).json({ error: 'Failed to update diary' });
   }
@@ -195,41 +211,60 @@ export const updateDiary = async (req: Request, res: Response): Promise<void> =>
  */
 export const deleteDiary = async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const { user } = requireAuthFromRequest(req);
+    
+    const idParam = req.params.id;
+    if (!idParam) {
+      res.status(400).json({ error: 'Diary ID is required' });
+      return;
+    }
 
+    const id = parseInt(idParam, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid diary ID' });
       return;
     }
 
     const diaryRepository = getDiaryRepository();
-    const result = await diaryRepository.delete(id);
-
-    if (!result) {
+    
+    // Check if diary exists and user owns it
+    const existingDiary = await diaryRepository.findById(id);
+    if (!existingDiary) {
       res.status(404).json({ error: 'Diary not found' });
       return;
     }
+
+    if (existingDiary.user.id !== user.id) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    await diaryRepository.delete(id);
 
     res.json({
       success: true,
       message: 'Diary deleted successfully'
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Authentication required') {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     console.error('Error deleting diary:', error);
     res.status(500).json({ error: 'Failed to delete diary' });
   }
 };
 
 /**
- * Get diary for specific user and date
+ * Get diary for specific date
  */
 export const getDiaryByUserAndDate = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = parseInt(req.params.userId, 10);
+    const { user } = requireAuthFromRequest(req);
+    
     const dateParam = req.params.date;
-
-    if (isNaN(userId)) {
-      res.status(400).json({ error: 'Invalid user ID' });
+    if (!dateParam) {
+      res.status(400).json({ error: 'Date parameter is required' });
       return;
     }
 
@@ -240,7 +275,7 @@ export const getDiaryByUserAndDate = async (req: Request, res: Response): Promis
     }
 
     const diaryRepository = getDiaryRepository();
-    const diary = await diaryRepository.findByUserIdAndDate(userId, date);
+    const diary = await diaryRepository.findByUserIdAndDate(user.id, date);
 
     if (!diary) {
       res.status(404).json({ 
@@ -255,6 +290,10 @@ export const getDiaryByUserAndDate = async (req: Request, res: Response): Promis
       data: diary
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Authentication required') {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     console.error('Error fetching diary by user and date:', error);
     res.status(500).json({ error: 'Failed to fetch diary' });
   }

@@ -105,6 +105,30 @@ export const AuthProvider = ({ children }) => {
 
   const handleUserSession = async (supabaseSession) => {
     try {
+      // Check if we already have this user session stored
+      const storedUser = localStorage.getItem('user');
+      const storedToken = localStorage.getItem('session_token');
+      
+      if (storedUser && storedToken) {
+        // Validate existing session first
+        const response = await fetch('http://localhost:8080/auth/validate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: storedToken })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+          setSessionToken(storedToken);
+          console.log('Existing session validated:', data.user);
+          return; // Don't create a new session
+        }
+      }
+
+      // Only create new session if no valid session exists
       const supabaseUser = supabaseSession.user;
       
       const userData = {
@@ -136,7 +160,7 @@ export const AuthProvider = ({ children }) => {
         setUser(result.user);
         setSessionToken(result.session.token);
         
-        console.log('User session created:', result.user);
+        console.log('New user session created:', result.user);
       } else {
         throw new Error('Failed to create user session');
       }

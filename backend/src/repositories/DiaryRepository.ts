@@ -1,4 +1,4 @@
-import { Repository } from "typeorm";
+import { Repository, Between } from "typeorm";
 import { Diary } from "../entities/diary";
 import { User } from "../entities/user";
 import AppDataSource from "../config/database";
@@ -45,10 +45,7 @@ export class DiaryRepository {
     return this.repository.findOne({
       where: {
         user: { id: userId },
-        date: {
-          $gte: startOfDay,
-          $lte: endOfDay
-        } as any
+        date: Between(startOfDay, endOfDay)
       },
       relations: ['user']
     });

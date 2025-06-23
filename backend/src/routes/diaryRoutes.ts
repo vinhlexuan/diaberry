@@ -7,13 +7,13 @@ const router: Router = express.Router();
 // All diary routes require authentication
 router.use(authenticateSession);
 
-// Get all diaries for a user
-router.get('/user/:userId', diaryController.getUserDiaries);
+// Get all diaries for authenticated user
+router.get('/', diaryController.getUserDiaries);
 
-// Get diary by specific user and date
-router.get('/user/:userId/date/:date', diaryController.getDiaryByUserAndDate);
+// Get diary by specific date for authenticated user
+router.get('/date/:date', diaryController.getDiaryByUserAndDate);
 
-// Get diary by ID
+// Get diary by ID (with ownership check)
 router.get('/:id', diaryController.getDiaryById);
 
 // Create new diary

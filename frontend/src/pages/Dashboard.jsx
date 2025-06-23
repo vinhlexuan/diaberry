@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import Calendar from 'react-calendar';
 import Header from '../components/Header.jsx';
+import { useAuth } from '../context/AuthContext';
 import { Plus, BookOpen, Calendar as CalendarIcon } from 'lucide-react';
 import '../styles/Dashboard.css';
 import 'react-calendar/dist/Calendar.css';
 
 function Dashboard() {
+  const { user, authenticatedFetch } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [diaries, setDiaries] = useState([]);
   const [selectedDiary, setSelectedDiary] = useState(null);
@@ -14,18 +16,20 @@ function Dashboard() {
   const [newDiaryContent, setNewDiaryContent] = useState('');
 
   useEffect(() => {
-    fetchDiaries();
-  }, []);
+    if (user) {
+      fetchDiaries();
+    }
+  }, [user]);
 
   const fetchDiaries = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      if (!user.id) {
+      if (!user?.id) {
         setLoading(false);
         return;
       }
 
-      const response = await fetch(`http://localhost:8080/api/diaries/user/${user.id}`);
+      // Updated API call - no user ID in URL
+      const response = await authenticatedFetch(`http://localhost:8080/api/diaries`);
       const data = await response.json();
       
       if (data.success) {
@@ -71,15 +75,13 @@ function Dashboard() {
     if (!newDiaryContent.trim()) return;
 
     try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      
-      const response = await fetch('http://localhost:8080/api/diaries', {
+      const response = await authenticatedFetch('http://localhost:8080/api/diaries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: user.id,
           date: selectedDate.toISOString(),
           content: newDiaryContent
+          // No user_id needed - comes from token
         })
       });
 
@@ -109,7 +111,7 @@ function Dashboard() {
 
   const handleEditDiary = async (diaryId, newContent) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/diaries/${diaryId}`, {
+      const response = await authenticatedFetch(`http://localhost:8080/api/diaries/${diaryId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -148,7 +150,7 @@ function Dashboard() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8080/api/diaries/${diaryId}`, {
+      const response = await authenticatedFetch(`http://localhost:8080/api/diaries/${diaryId}`, {
         method: 'DELETE'
       });
 
