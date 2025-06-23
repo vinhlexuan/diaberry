@@ -208,7 +208,6 @@ function Dashboard() {
             <div className="calendar-legend">
               <div className="legend-item">
                 <div className="diary-indicator"></div>
-                <span>Has diary entry</span>
               </div>
             </div>
           </div>
