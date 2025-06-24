@@ -10,7 +10,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
   CircularProgress,
   useTheme,
   useMediaQuery,
@@ -34,6 +33,7 @@ import { PickersDay } from '@mui/x-date-pickers/PickersDay';
 import dayjs from 'dayjs';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
+import RichTextEditor from '../components/RichTextEditor';
 
 function Dashboard() {
   const { user, authenticatedFetch } = useAuth();
@@ -110,7 +110,7 @@ function Dashboard() {
     );
 
     return (
-      <Box sx={{ position: 'relative' }}>
+      <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
         <PickersDay
           {...other}
           day={day}
@@ -129,10 +129,12 @@ function Dashboard() {
           <FiberManualRecord
             sx={{
               position: 'absolute',
-              bottom: 2,
-              right: 2,
+              bottom: 4,
+              right: 4,
               fontSize: 8,
               color: 'secondary.main',
+              pointerEvents: 'none', // Prevent interference with day clicking
+              zIndex: 1,
             }}
           />
         )}
@@ -253,7 +255,7 @@ function Dashboard() {
     <Layout>
       {/* Mobile Calendar Toggle */}
       {isMobile && (
-        <Card sx={{ mb: 2 }}>
+        <Card sx={{ mb: 2, transform: 'scale(0.9)', transformOrigin: 'top left', width: '111.11%' }}>
           <CardContent sx={{ py: 1 }}>
             <Button
               fullWidth
@@ -287,6 +289,20 @@ function Dashboard() {
                     '& .MuiPickersDay-root': {
                       fontSize: '0.875rem',
                     },
+                    // Ensure day cells have enough space for the indicator
+                    '& .MuiDayCalendar-weekDayLabel': {
+                      margin: 0,
+                    },
+                    '& .MuiPickersDay-dayWithMargin': {
+                      margin: '2px',
+                    },
+                    // Prevent overflow clipping
+                    '& .MuiDayCalendar-monthContainer': {
+                      overflow: 'visible',
+                    },
+                    '& .MuiDayCalendar-weekContainer': {
+                      overflow: 'visible',
+                    },
                   }}
                 />
                 
@@ -319,6 +335,9 @@ function Dashboard() {
         height: { xs: 'auto', md: 'calc(100vh - 200px)' },
         minHeight: { xs: 'auto', md: '600px' },
         flexDirection: { xs: 'column', md: 'row' },
+        transform: { xs: 'none', md: 'scale(0.9)' },
+        transformOrigin: { xs: 'none', md: 'top left' },
+        width: { xs: '100%', md: '111.11%' },
       }}>
         {/* Calendar Section - Hidden on mobile */}
         {!isMobile && (
@@ -374,6 +393,20 @@ function Dashboard() {
                     '& .MuiPickersMonth-monthButton': {
                       fontSize: '0.875rem',
                       margin: '4px',
+                    },
+                    // Ensure day cells have enough space for the indicator
+                    '& .MuiDayCalendar-weekDayLabel': {
+                      margin: 0,
+                    },
+                    '& .MuiPickersDay-dayWithMargin': {
+                      margin: '2px',
+                    },
+                    // Prevent overflow clipping
+                    '& .MuiDayCalendar-monthContainer': {
+                      overflow: 'visible',
+                    },
+                    '& .MuiDayCalendar-weekContainer': {
+                      overflow: 'visible',
                     },
                   }}
                 />
@@ -476,18 +509,64 @@ function Dashboard() {
                         minHeight: { xs: '200px', md: 'auto' },
                       }}
                     >
-                      <Typography 
-                        variant="body1" 
+                      <Box
                         sx={{ 
-                          lineHeight: 1.6, 
-                          whiteSpace: 'pre-wrap',
+                          lineHeight: 1.6,
                           overflow: 'auto',
                           flex: 1,
-                          fontSize: { xs: '0.9rem', sm: '1rem' }
+                          fontSize: { xs: '0.9rem', sm: '1rem' },
+                          '& p': {
+                            margin: '0.5em 0',
+                            '&:first-of-type': {
+                              marginTop: 0,
+                            },
+                            '&:last-of-type': {
+                              marginBottom: 0,
+                            },
+                          },
+                          '& ul, & ol': {
+                            pl: 3,
+                            my: 1,
+                          },
+                          '& li': {
+                            mb: 0.5,
+                          },
+                          '& a': {
+                            color: 'primary.main',
+                            textDecoration: 'underline',
+                            '&:hover': {
+                              textDecoration: 'none',
+                            },
+                          },
+                          '& blockquote': {
+                            borderLeft: '4px solid',
+                            borderColor: 'primary.main',
+                            pl: 2,
+                            ml: 0,
+                            my: 1,
+                            fontStyle: 'italic',
+                            backgroundColor: 'grey.100',
+                            py: 1,
+                            borderRadius: '0 4px 4px 0',
+                          },
+                          '& pre': {
+                            backgroundColor: 'grey.200',
+                            p: 1,
+                            borderRadius: 1,
+                            overflow: 'auto',
+                            fontFamily: 'monospace',
+                            fontSize: '0.875rem',
+                            my: 1,
+                          },
+                          '& h1, & h2, & h3, & h4, & h5, & h6': {
+                            margin: '1em 0 0.5em 0',
+                            '&:first-of-type': {
+                              marginTop: 0,
+                            },
+                          },
                         }}
-                      >
-                        {selectedDiary.content}
-                      </Typography>
+                        dangerouslySetInnerHTML={{ __html: selectedDiary.content }}
+                      />
                     </Paper>
                     
                     <Box sx={{ 
@@ -571,6 +650,7 @@ function Dashboard() {
             bottom: 16,
             right: 16,
             zIndex: 1000,
+            transform: 'scale(0.9)',
           }}
         >
           <AddIcon />
@@ -584,6 +664,12 @@ function Dashboard() {
         maxWidth="sm"
         fullWidth
         fullScreen={isMobile}
+        PaperProps={{
+          sx: {
+            transform: { xs: 'none', md: 'scale(0.9)' },
+            transformOrigin: { xs: 'none', md: 'center' },
+          }
+        }}
       >
         <DialogTitle sx={{ 
           display: 'flex', 
@@ -600,17 +686,11 @@ function Dashboard() {
           <Typography variant="body2" color="text.secondary" gutterBottom>
             {selectedDate.format('dddd, MMMM D, YYYY')}
           </Typography>
-          <TextField
-            autoFocus
-            margin="dense"
-            fullWidth
-            multiline
-            rows={isMobile ? 10 : 8}
-            variant="outlined"
-            placeholder="Write about your day, feelings, health observations..."
+          <RichTextEditor
             value={newDiaryContent}
-            onChange={(e) => setNewDiaryContent(e.target.value)}
-            sx={{ mt: 2 }}
+            onChange={setNewDiaryContent}
+            placeholder="Write about your day, feelings, health observations..."
+            minHeight={isMobile ? '250px' : '300px'}
           />
         </DialogContent>
         <DialogActions sx={{ 
@@ -642,6 +722,12 @@ function Dashboard() {
         maxWidth="sm"
         fullWidth
         fullScreen={isMobile}
+        PaperProps={{
+          sx: {
+            transform: { xs: 'none', md: 'scale(0.9)' },
+            transformOrigin: { xs: 'none', md: 'center' },
+          }
+        }}
       >
         <DialogTitle sx={{ 
           display: 'flex', 
@@ -658,16 +744,11 @@ function Dashboard() {
           <Typography variant="body2" color="text.secondary" gutterBottom>
             {editingDiary?.date.format('dddd, MMMM D, YYYY')}
           </Typography>
-          <TextField
-            autoFocus
-            margin="dense"
-            fullWidth
-            multiline
-            rows={isMobile ? 10 : 8}
-            variant="outlined"
+          <RichTextEditor
             value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            sx={{ mt: 2 }}
+            onChange={setEditContent}
+            placeholder="Edit your diary entry..."
+            minHeight={isMobile ? '250px' : '300px'}
           />
         </DialogContent>
         <DialogActions sx={{ 

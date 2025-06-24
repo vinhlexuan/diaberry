@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Container,
   Card,
@@ -31,6 +31,7 @@ import {
 } from '@mui/icons-material';
 import dayjs from 'dayjs';
 import Layout from '../components/Layout';
+import RichTextEditor from '../components/RichTextEditor';
 import { useAuth } from '../context/AuthContext';
 
 function ManageDiary() {
@@ -47,33 +48,22 @@ function ManageDiary() {
   
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
 
-  useEffect(() => {
-    if (user) {
-      fetchDiaries();
+  // Use refs to prevent duplicate API calls
+  const isFetching = useRef(false);
+  const hasInitialized = useRef(false);
+
+  const fetchDiaries = useCallback(async () => {
+    // Prevent multiple simultaneous fetches
+    if (isFetching.current || !user?.id) {
+      return;
     }
-  }, [user]);
 
-  useEffect(() => {
-    // Filter diaries based on search term
-    if (searchTerm.trim() === '') {
-      setFilteredDiaries(diaries);
-    } else {
-      const filtered = diaries.filter(diary => 
-        diary.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        diary.date.format('MMMM D, YYYY').toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredDiaries(filtered);
-    }
-  }, [diaries, searchTerm]);
+    isFetching.current = true;
+    setLoading(true);
 
-  const fetchDiaries = async () => {
     try {
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
-
       const response = await authenticatedFetch(`http://localhost:8080/api/diaries`);
       const data = await response.json();
       
@@ -88,16 +78,43 @@ function ManageDiary() {
       } else {
         console.error('Failed to fetch diaries:', data.error);
       }
-      
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching diaries:', error);
+    } finally {
       setLoading(false);
+      isFetching.current = false;
     }
+  }, [user?.id, authenticatedFetch]);
+
+  // Initialize only once when user is available
+  useEffect(() => {
+    if (user?.id && !hasInitialized.current) {
+      hasInitialized.current = true;
+      fetchDiaries();
+    }
+  }, [user?.id, fetchDiaries]);
+
+  useEffect(() => {
+    // Filter diaries based on search term
+    if (searchTerm.trim() === '') {
+      setFilteredDiaries(diaries);
+    } else {
+      const filtered = diaries.filter(diary => 
+        diary.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        diary.date.format('MMMM D, YYYY').toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredDiaries(filtered);
+    }
+  }, [diaries, searchTerm]);
+
+  const stripHtmlTags = (html) => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || "";
   };
 
   const handleCreateDiary = async () => {
-    if (!newDiaryContent.trim() || !newDiaryDate) return;
+    const textContent = stripHtmlTags(newDiaryContent);
+    if (!textContent.trim() || !newDiaryDate) return;
 
     try {
       const response = await authenticatedFetch('http://localhost:8080/api/diaries', {
@@ -105,7 +122,7 @@ function ManageDiary() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: dayjs(newDiaryDate).toISOString(),
-          content: newDiaryContent
+          content: newDiaryContent // Store HTML content
         })
       });
 
@@ -132,14 +149,15 @@ function ManageDiary() {
   };
 
   const handleEditDiary = async () => {
-    if (!editContent.trim() || !editingDiary) return;
+    const textContent = stripHtmlTags(editContent);
+    if (!textContent.trim() || !editingDiary) return;
 
     try {
       const response = await authenticatedFetch(`http://localhost:8080/api/diaries/${editingDiary.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: editContent
+          content: editContent // Store HTML content
         })
       });
 
@@ -285,19 +303,19 @@ function ManageDiary() {
                         position: 'relative'
                       }}
                     >
-                      <Typography 
-                        variant="body2" 
+                      <Box
                         sx={{ 
-                          lineHeight: 1.6, 
-                          whiteSpace: 'pre-wrap',
+                          lineHeight: 1.6,
                           display: '-webkit-box',
                           WebkitLineClamp: 5,
                           WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden'
+                          overflow: 'hidden',
+                          '& *': {
+                            fontSize: '0.875rem !important',
+                          }
                         }}
-                      >
-                        {diary.content}
-                      </Typography>
+                        dangerouslySetInnerHTML={{ __html: diary.content }}
+                      />
                     </Paper>
 
                     {/* Meta Info */}
@@ -365,94 +383,166 @@ function ManageDiary() {
         )}
       </Container>
 
-      {/* New Diary Modal */}
+      {/* New Diary Modal - Now with Rich Text Editor */}
       <Dialog 
         open={showNewDiaryModal} 
         onClose={() => setShowNewDiaryModal(false)}
-        maxWidth="sm"
+        maxWidth="lg"
         fullWidth
         fullScreen={isMobile}
+        PaperProps={{
+          sx: {
+            height: { xs: '100%', md: '80vh' },
+            maxHeight: '90vh'
+          }
+        }}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">New Diary Entry</Typography>
-          <IconButton onClick={() => setShowNewDiaryModal(false)}>
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          pb: 2
+        }}>
+          <Box>
+            <Typography variant="h5" component="h2" gutterBottom>
+              Create New Diary Entry
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Write about your day, thoughts, and experiences
+            </Typography>
+          </Box>
+          <IconButton onClick={() => setShowNewDiaryModal(false)} size="large">
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent>
-          <TextField
-            label="Date"
-            type="date"
-            fullWidth
-            value={newDiaryDate}
-            onChange={(e) => setNewDiaryDate(e.target.value)}
-            sx={{ mb: 2 }}
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField
-            autoFocus
-            margin="dense"
-            fullWidth
-            multiline
-            rows={8}
-            variant="outlined"
-            placeholder="Write about your day, feelings, health observations..."
-            value={newDiaryContent}
-            onChange={(e) => setNewDiaryContent(e.target.value)}
-          />
+        
+        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Box sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <TextField
+              label="Date"
+              type="date"
+              fullWidth
+              value={newDiaryDate}
+              onChange={(e) => setNewDiaryDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ maxWidth: 300 }}
+            />
+          </Box>
+          
+          <Box sx={{ flex: 1, p: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
+              Content
+            </Typography>
+            <Box sx={{ flex: 1, minHeight: 0 }}>
+              <RichTextEditor
+                value={newDiaryContent}
+                onChange={setNewDiaryContent}
+                placeholder="Write about your day, feelings, health observations, or anything that's on your mind..."
+                minHeight={isMobile ? '250px' : '400px'}
+              />
+            </Box>
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setShowNewDiaryModal(false)}>
+        
+        <DialogActions sx={{ 
+          p: 3,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 1, sm: 2 }
+        }}>
+          <Button 
+            onClick={() => setShowNewDiaryModal(false)}
+            size="large"
+            sx={{ width: { xs: '100%', sm: 'auto' }, order: { xs: 2, sm: 1 } }}
+          >
             Cancel
           </Button>
           <Button 
             variant="contained"
             onClick={handleCreateDiary}
-            disabled={!newDiaryContent.trim() || !newDiaryDate}
+            disabled={!stripHtmlTags(newDiaryContent).trim() || !newDiaryDate}
+            size="large"
+            sx={{ width: { xs: '100%', sm: 'auto' }, order: { xs: 1, sm: 2 } }}
           >
             Save Entry
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Edit Diary Modal */}
+      {/* Edit Diary Modal - Also with Rich Text Editor */}
       <Dialog 
         open={Boolean(editingDiary)} 
         onClose={() => setEditingDiary(null)}
-        maxWidth="sm"
+        maxWidth="lg"
         fullWidth
         fullScreen={isMobile}
+        PaperProps={{
+          sx: {
+            height: { xs: '100%', md: '80vh' },
+            maxHeight: '90vh'
+          }
+        }}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">Edit Diary Entry</Typography>
-          <IconButton onClick={() => setEditingDiary(null)}>
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          pb: 2
+        }}>
+          <Box>
+            <Typography variant="h5" component="h2" gutterBottom>
+              Edit Diary Entry
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {editingDiary?.date.format('dddd, MMMM D, YYYY')}
+            </Typography>
+          </Box>
+          <IconButton onClick={() => setEditingDiary(null)} size="large">
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            {editingDiary?.date.format('dddd, MMMM D, YYYY')}
-          </Typography>
-          <TextField
-            autoFocus
-            margin="dense"
-            fullWidth
-            multiline
-            rows={8}
-            variant="outlined"
-            value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            sx={{ mt: 2 }}
-          />
+        
+        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Box sx={{ flex: 1, p: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
+              Content
+            </Typography>
+            <Box sx={{ flex: 1, minHeight: 0 }}>
+              <RichTextEditor
+                value={editContent}
+                onChange={setEditContent}
+                placeholder="Edit your diary entry..."
+                minHeight={isMobile ? '250px' : '400px'}
+              />
+            </Box>
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setEditingDiary(null)}>
+        
+        <DialogActions sx={{ 
+          p: 3,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 1, sm: 2 }
+        }}>
+          <Button 
+            onClick={() => setEditingDiary(null)}
+            size="large"
+            sx={{ width: { xs: '100%', sm: 'auto' }, order: { xs: 2, sm: 1 } }}
+          >
             Cancel
           </Button>
           <Button 
             variant="contained"
             onClick={handleEditDiary}
-            disabled={!editContent.trim()}
+            disabled={!stripHtmlTags(editContent).trim()}
+            size="large"
+            sx={{ width: { xs: '100%', sm: 'auto' }, order: { xs: 1, sm: 2 } }}
           >
             Update Entry
           </Button>
