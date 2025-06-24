@@ -15,6 +15,8 @@ import {
   useTheme,
   useMediaQuery,
   Paper,
+  Collapse,
+  Fab,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -24,6 +26,8 @@ import {
   Delete as DeleteIcon,
   Close as CloseIcon,
   FiberManualRecord,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { PickersDay } from '@mui/x-date-pickers/PickersDay';
@@ -41,9 +45,11 @@ function Dashboard() {
   const [newDiaryContent, setNewDiaryContent] = useState('');
   const [editingDiary, setEditingDiary] = useState(null);
   const [editContent, setEditContent] = useState('');
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
   
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isTablet = useMediaQuery(theme.breakpoints.between('md', 'lg'));
   
   // Use refs to prevent duplicate API calls
   const isFetching = useRef(false);
@@ -245,119 +251,186 @@ function Dashboard() {
 
   return (
     <Layout>
-      {/* Main Content with Fixed Widths - No Header */}
+      {/* Mobile Calendar Toggle */}
+      {isMobile && (
+        <Card sx={{ mb: 2 }}>
+          <CardContent sx={{ py: 1 }}>
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<CalendarToday />}
+              endIcon={calendarExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              onClick={() => setCalendarExpanded(!calendarExpanded)}
+              sx={{ justifyContent: 'space-between' }}
+            >
+              <Typography variant="body2">
+                {selectedDate.format('MMMM D, YYYY')}
+              </Typography>
+            </Button>
+            <Collapse in={calendarExpanded}>
+              <Box sx={{ mt: 2 }}>
+                <DateCalendar
+                  value={selectedDate}
+                  onChange={(newValue) => {
+                    setSelectedDate(newValue);
+                    setCalendarExpanded(false); // Close calendar after selection
+                  }}
+                  slots={{
+                    day: CustomPickersDay,
+                  }}
+                  minDate={dayjs('2000-01-01')}
+                  maxDate={dayjs('2099-12-31')}
+                  views={['year', 'month', 'day']}
+                  openTo="day"
+                  sx={{
+                    width: '100%',
+                    '& .MuiPickersDay-root': {
+                      fontSize: '0.875rem',
+                    },
+                  }}
+                />
+                
+                {/* Mobile Legend */}
+                <Box sx={{ 
+                  mt: 1, 
+                  pt: 1, 
+                  borderTop: '1px solid', 
+                  borderColor: 'divider',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  justifyContent: 'center',
+                }}>
+                  <FiberManualRecord sx={{ fontSize: 12, color: 'secondary.main' }} />
+                  <Typography variant="caption" color="text.secondary">
+                    Has diary entry
+                  </Typography>
+                </Box>
+              </Box>
+            </Collapse>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Desktop/Tablet Layout */}
       <Box sx={{ 
         display: 'flex', 
-        gap: 3,
-        height: 'calc(100vh - 200px)', // Adjusted height since no header
-        minHeight: '600px',
-        // Stack vertically on mobile
+        gap: { xs: 0, md: 3 },
+        height: { xs: 'auto', md: 'calc(100vh - 200px)' },
+        minHeight: { xs: 'auto', md: '600px' },
         flexDirection: { xs: 'column', md: 'row' },
       }}>
-        {/* Calendar Section - Fixed 20% width on desktop */}
-        <Box sx={{ 
-          width: { xs: '100%', md: '20%' },
-          minWidth: { md: '300px' }, // Minimum width to keep calendar usable
-          flexShrink: 0,
-        }}>
-          <Card sx={{ 
-            height: '100%', 
-            display: 'flex', 
-            flexDirection: 'column',
+        {/* Calendar Section - Hidden on mobile */}
+        {!isMobile && (
+          <Box sx={{ 
+            width: { md: isTablet ? '35%' : '25%' },
+            minWidth: { md: '280px' },
+            maxWidth: { md: '350px' },
+            flexShrink: 0,
           }}>
-            <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <DateCalendar
-                value={selectedDate}
-                onChange={(newValue) => setSelectedDate(newValue)}
-                slots={{
-                  day: CustomPickersDay,
-                }}
-                // Fix calendar year selection by adding min/max dates
-                minDate={dayjs('2000-01-01')}
-                maxDate={dayjs('2099-12-31')}
-                views={['year', 'month', 'day']}
-                openTo="day"
-                sx={{
-                  width: '100%',
-                  flex: 1,
-                  '& .MuiPickersCalendarHeader-root': {
-                    paddingLeft: 1,
-                    paddingRight: 1,
-                  },
-                  // Make calendar responsive within fixed width
-                  '& .MuiDayCalendar-root': {
+            <Card sx={{ 
+              height: '100%', 
+              display: 'flex', 
+              flexDirection: 'column',
+            }}>
+              <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <DateCalendar
+                  value={selectedDate}
+                  onChange={(newValue) => setSelectedDate(newValue)}
+                  slots={{
+                    day: CustomPickersDay,
+                  }}
+                  minDate={dayjs('2000-01-01')}
+                  maxDate={dayjs('2099-12-31')}
+                  views={['year', 'month', 'day']}
+                  openTo="day"
+                  sx={{
                     width: '100%',
-                  },
-                  '& .MuiPickersDay-root': {
-                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                    width: { xs: '28px', sm: '36px' },
-                    height: { xs: '28px', sm: '36px' },
-                  },
-                  // Fix year selection view styling
-                  '& .MuiYearCalendar-root': {
-                    width: '100%',
-                    height: 'auto',
-                  },
-                  '& .MuiPickersYear-yearButton': {
-                    fontSize: '0.875rem',
-                    margin: '2px',
-                  },
-                  // Fix month selection view styling
-                  '& .MuiMonthCalendar-root': {
-                    width: '100%',
-                    height: 'auto',
-                  },
-                  '& .MuiPickersMonth-monthButton': {
-                    fontSize: '0.875rem',
-                    margin: '4px',
-                  },
-                }}
-              />
-              
-              {/* Legend */}
-              <Box sx={{ 
-                mt: 2, 
-                pt: 2, 
-                borderTop: '1px solid', 
-                borderColor: 'divider',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                flexShrink: 0,
-              }}>
-                <FiberManualRecord sx={{ fontSize: 12, color: 'secondary.main' }} />
-                <Typography variant="body2" color="text.secondary">
-                  Has diary entry
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Box>
+                    flex: 1,
+                    '& .MuiPickersCalendarHeader-root': {
+                      paddingLeft: 1,
+                      paddingRight: 1,
+                    },
+                    '& .MuiDayCalendar-root': {
+                      width: '100%',
+                    },
+                    '& .MuiPickersDay-root': {
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      width: { xs: '28px', sm: '36px' },
+                      height: { xs: '28px', sm: '36px' },
+                    },
+                    '& .MuiYearCalendar-root': {
+                      width: '100%',
+                      height: 'auto',
+                    },
+                    '& .MuiPickersYear-yearButton': {
+                      fontSize: '0.875rem',
+                      margin: '2px',
+                    },
+                    '& .MuiMonthCalendar-root': {
+                      width: '100%',
+                      height: 'auto',
+                    },
+                    '& .MuiPickersMonth-monthButton': {
+                      fontSize: '0.875rem',
+                      margin: '4px',
+                    },
+                  }}
+                />
+                
+                {/* Legend */}
+                <Box sx={{ 
+                  mt: 2, 
+                  pt: 2, 
+                  borderTop: '1px solid', 
+                  borderColor: 'divider',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  flexShrink: 0,
+                }}>
+                  <FiberManualRecord sx={{ fontSize: 12, color: 'secondary.main' }} />
+                  <Typography variant="body2" color="text.secondary">
+                    Has diary entry
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
 
-        {/* Diary Section - Fixed 70% width on desktop */}
+        {/* Diary Section */}
         <Box sx={{ 
-          width: { xs: '100%', md: '70%' },
+          width: { xs: '100%', md: isTablet ? '65%' : '73%' },
           flexShrink: 0,
         }}>
           <Card sx={{ 
-            height: '100%', 
+            height: { xs: 'auto', md: '100%' }, 
             display: 'flex', 
             flexDirection: 'column',
+            minHeight: { xs: '400px', md: 'auto' },
           }}>
             <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               {/* Diary Header */}
               <Box sx={{ 
                 display: 'flex', 
                 justifyContent: 'space-between', 
-                alignItems: 'flex-start',
+                alignItems: { xs: 'flex-start', sm: 'center' },
                 mb: 2,
-                flexWrap: 'wrap',
-                gap: 2,
+                flexDirection: { xs: 'column', sm: 'row' },
+                gap: { xs: 1, sm: 2 },
                 flexShrink: 0,
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
-                  <CalendarToday color="primary" />
-                  <Typography variant="h6" component="h2" noWrap>
+                  <CalendarToday color="primary" sx={{ display: { xs: 'none', sm: 'block' } }} />
+                  <Typography 
+                    variant={isMobile ? "h6" : "h5"} 
+                    component="h2" 
+                    sx={{ 
+                      fontWeight: 600,
+                      fontSize: { xs: '1.1rem', sm: '1.25rem', md: '1.5rem' }
+                    }}
+                  >
                     {selectedDate.format('dddd, MMMM D, YYYY')}
                   </Typography>
                 </Box>
@@ -368,20 +441,23 @@ function Dashboard() {
                     startIcon={<AddIcon />}
                     onClick={() => setShowNewDiaryModal(true)}
                     size={isMobile ? 'small' : 'medium'}
-                    sx={{ flexShrink: 0 }}
+                    sx={{ 
+                      flexShrink: 0,
+                      width: { xs: '100%', sm: 'auto' }
+                    }}
                   >
                     Add Entry
                   </Button>
                 )}
               </Box>
 
-              {/* Diary Content - Expandable area */}
+              {/* Diary Content */}
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {selectedDiary ? (
                   <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexShrink: 0 }}>
                       <MenuBook fontSize="small" color="action" />
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary">
                         Created: {selectedDiary.created_at.format('MMM D, YYYY [at] h:mm A')}
                       </Typography>
                     </Box>
@@ -389,7 +465,7 @@ function Dashboard() {
                     <Paper 
                       variant="outlined" 
                       sx={{ 
-                        p: 2, 
+                        p: { xs: 2, sm: 3 }, 
                         mb: 2, 
                         backgroundColor: 'grey.50',
                         borderRadius: 2,
@@ -397,6 +473,7 @@ function Dashboard() {
                         overflow: 'auto',
                         display: 'flex',
                         flexDirection: 'column',
+                        minHeight: { xs: '200px', md: 'auto' },
                       }}
                     >
                       <Typography 
@@ -406,18 +483,26 @@ function Dashboard() {
                           whiteSpace: 'pre-wrap',
                           overflow: 'auto',
                           flex: 1,
+                          fontSize: { xs: '0.9rem', sm: '1rem' }
                         }}
                       >
                         {selectedDiary.content}
                       </Typography>
                     </Paper>
                     
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', flexShrink: 0 }}>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      gap: 1, 
+                      flexWrap: 'wrap', 
+                      flexShrink: 0,
+                      flexDirection: { xs: 'column', sm: 'row' }
+                    }}>
                       <Button
                         variant="outlined"
                         startIcon={<EditIcon />}
                         onClick={() => startEdit(selectedDiary)}
                         size="small"
+                        sx={{ flex: { xs: 1, sm: 'none' } }}
                       >
                         Edit
                       </Button>
@@ -431,6 +516,7 @@ function Dashboard() {
                           }
                         }}
                         size="small"
+                        sx={{ flex: { xs: 1, sm: 'none' } }}
                       >
                         Delete
                       </Button>
@@ -443,14 +529,26 @@ function Dashboard() {
                     alignItems: 'center', 
                     justifyContent: 'center',
                     textAlign: 'center', 
-                    py: 4 
+                    py: { xs: 3, md: 4 }
                   }}>
                     <Box>
-                      <MenuBook sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
-                      <Typography variant="h6" gutterBottom color="text.secondary">
+                      <MenuBook sx={{ 
+                        fontSize: { xs: 40, sm: 48 }, 
+                        color: 'text.disabled', 
+                        mb: 2 
+                      }} />
+                      <Typography 
+                        variant={isMobile ? "subtitle1" : "h6"} 
+                        gutterBottom 
+                        color="text.secondary"
+                      >
                         No diary entry for this date
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary"
+                        sx={{ mb: { xs: 2, sm: 0 } }}
+                      >
                         Click "Add Entry" to create your first diary entry for this day.
                       </Typography>
                     </Box>
@@ -462,6 +560,23 @@ function Dashboard() {
         </Box>
       </Box>
 
+      {/* Mobile FAB for adding entry */}
+      {isMobile && !selectedDiary && (
+        <Fab
+          color="primary"
+          aria-label="add"
+          onClick={() => setShowNewDiaryModal(true)}
+          sx={{
+            position: 'fixed',
+            bottom: 16,
+            right: 16,
+            zIndex: 1000,
+          }}
+        >
+          <AddIcon />
+        </Fab>
+      )}
+
       {/* New Diary Modal */}
       <Dialog 
         open={showNewDiaryModal} 
@@ -470,13 +585,18 @@ function Dashboard() {
         fullWidth
         fullScreen={isMobile}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          pb: { xs: 1, sm: 2 }
+        }}>
           <Typography variant="h6">New Diary Entry</Typography>
           <IconButton onClick={() => setShowNewDiaryModal(false)}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pt: { xs: 1, sm: 2 } }}>
           <Typography variant="body2" color="text.secondary" gutterBottom>
             {selectedDate.format('dddd, MMMM D, YYYY')}
           </Typography>
@@ -485,7 +605,7 @@ function Dashboard() {
             margin="dense"
             fullWidth
             multiline
-            rows={8}
+            rows={isMobile ? 10 : 8}
             variant="outlined"
             placeholder="Write about your day, feelings, health observations..."
             value={newDiaryContent}
@@ -493,14 +613,22 @@ function Dashboard() {
             sx={{ mt: 2 }}
           />
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setShowNewDiaryModal(false)}>
+        <DialogActions sx={{ 
+          p: 3,
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 1, sm: 0 }
+        }}>
+          <Button 
+            onClick={() => setShowNewDiaryModal(false)}
+            sx={{ width: { xs: '100%', sm: 'auto' } }}
+          >
             Cancel
           </Button>
           <Button 
             variant="contained"
             onClick={handleCreateDiary}
             disabled={!newDiaryContent.trim()}
+            sx={{ width: { xs: '100%', sm: 'auto' } }}
           >
             Save Entry
           </Button>
@@ -515,13 +643,18 @@ function Dashboard() {
         fullWidth
         fullScreen={isMobile}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          pb: { xs: 1, sm: 2 }
+        }}>
           <Typography variant="h6">Edit Diary Entry</Typography>
           <IconButton onClick={() => setEditingDiary(null)}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pt: { xs: 1, sm: 2 } }}>
           <Typography variant="body2" color="text.secondary" gutterBottom>
             {editingDiary?.date.format('dddd, MMMM D, YYYY')}
           </Typography>
@@ -530,21 +663,29 @@ function Dashboard() {
             margin="dense"
             fullWidth
             multiline
-            rows={8}
+            rows={isMobile ? 10 : 8}
             variant="outlined"
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             sx={{ mt: 2 }}
           />
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setEditingDiary(null)}>
+        <DialogActions sx={{ 
+          p: 3,
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 1, sm: 0 }
+        }}>
+          <Button 
+            onClick={() => setEditingDiary(null)}
+            sx={{ width: { xs: '100%', sm: 'auto' } }}
+          >
             Cancel
           </Button>
           <Button 
             variant="contained"
             onClick={handleEditDiary}
             disabled={!editContent.trim()}
+            sx={{ width: { xs: '100%', sm: 'auto' } }}
           >
             Update Entry
           </Button>

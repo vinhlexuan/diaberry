@@ -11,7 +11,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { Google } from '@mui/icons-material';
-import { supabase } from '../utils/supabaseClient';
+import { supabase } from '../utils/SupabaseClient';
 
 function Login() {
   const [email, setEmail] = useState('');

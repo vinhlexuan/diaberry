@@ -4,21 +4,25 @@ import {
   Toolbar,
   Typography,
   Button,
-  Avatar,
-  Box,
   IconButton,
+  Box,
+  Avatar,
+  Chip,
   Menu,
   MenuItem,
+  ListItemIcon,
+  ListItemText,
   useTheme,
   useMediaQuery,
-  Chip,
 } from '@mui/material';
 import {
-  Person,
-  ExitToApp,
   Menu as MenuIcon,
+  ExitToApp,
+  Person,
+  AccountCircle,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { getCookie } from '../utils/CookieUtils';
 
 function Header({ onSidebarToggle }) {
   const { user, signOut } = useAuth();
@@ -29,17 +33,15 @@ function Header({ onSidebarToggle }) {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
+    const storedUser = getCookie('user');
     if (storedUser) {
       setUserInfo(JSON.parse(storedUser));
     }
-  }, []);
+  }, [user]);
 
   const handleSignOut = async () => {
     try {
       await signOut();
-      localStorage.removeItem('user');
-      localStorage.removeItem('supabase_session');
       window.location.href = '/login';
     } catch (error) {
       console.error('Error signing out:', error);
@@ -63,38 +65,34 @@ function Header({ onSidebarToggle }) {
         color: 'text.primary',
         borderBottom: '1px solid',
         borderColor: 'divider',
-        zIndex: theme.zIndex.drawer + 1,
       }}
     >
       <Toolbar sx={{ justifyContent: 'space-between' }}>
-        {/* Mobile Menu Button */}
-        {isMobile && (
+        {/* Left side - Menu button */}
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <IconButton
             edge="start"
             color="inherit"
+            aria-label="menu"
             onClick={onSidebarToggle}
-            sx={{ mr: 2 }}
+            sx={{ mr: 2, display: { md: 'none' } }}
           >
             <MenuIcon />
           </IconButton>
-        )}
+          
+          {/* Desktop title */}
+          {!isMobile && (
+            <Typography 
+              variant="h6" 
+              sx={{ fontWeight: 600, color: 'primary.main' }}
+            >
+              Personal Diary Calendar
+            </Typography>
+          )}
+        </Box>
 
-        {/* Page Title - will be updated per page */}
-        <Typography 
-          variant="h6" 
-          component="h1" 
-          sx={{ 
-            fontWeight: 600,
-            color: 'text.primary',
-            flex: 1,
-          }}
-        >
-          Personal Diary Calendar
-        </Typography>
-
-        {/* User Section */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
-          {/* User Info */}
+        {/* Right side - User info and sign out */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {userInfo && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Avatar
@@ -134,7 +132,7 @@ function Header({ onSidebarToggle }) {
           )}
         </Box>
 
-        {/* User Menu */}
+        {/* User Menu - Mobile */}
         <Menu
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}
@@ -148,21 +146,21 @@ function Header({ onSidebarToggle }) {
             horizontal: 'right',
           }}
         >
-          {userInfo && (
-            <MenuItem disabled>
-              <Box>
-                <Typography variant="subtitle2">
-                  {userInfo.first_name} {userInfo.last_name}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {userInfo.email}
-                </Typography>
-              </Box>
-            </MenuItem>
-          )}
+          <MenuItem onClick={handleMenuClose}>
+            <ListItemIcon>
+              <AccountCircle fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>
+              {userInfo?.email}
+            </ListItemText>
+          </MenuItem>
           <MenuItem onClick={handleSignOut}>
-            <ExitToApp sx={{ mr: 1 }} />
-            Sign Out
+            <ListItemIcon>
+              <ExitToApp fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>
+              Sign Out
+            </ListItemText>
           </MenuItem>
         </Menu>
       </Toolbar>

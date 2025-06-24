@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../utils/supabaseClient';
+import { 
+  setAuthCookies, 
+  getAuthCookies, 
+  clearAuthCookies,
+  setCookie,
+  getCookie 
+} from '../utils/CookieUtils';
 
 const AuthContext = createContext();
 
@@ -45,8 +52,7 @@ export const AuthProvider = ({ children }) => {
 
   const checkExistingSession = async () => {
     try {
-      const storedToken = localStorage.getItem('session_token');
-      const storedUser = localStorage.getItem('user');
+      const { user: storedUser, sessionToken: storedToken, refreshToken } = getAuthCookies();
       
       if (storedToken && storedUser) {
         // Validate session with backend
@@ -62,14 +68,13 @@ export const AuthProvider = ({ children }) => {
           const data = await response.json();
           setUser(data.user);
           setSessionToken(storedToken);
-          console.log('Session restored:', data.user);
+          console.log('Session restored from cookies:', data.user);
         } else {
           // Session invalid, try to refresh
-          const refreshToken = localStorage.getItem('refresh_token');
           if (refreshToken) {
             await attemptRefresh(refreshToken);
           } else {
-            clearStoredAuth();
+            clearAuthCookies();
           }
         }
       } else {
@@ -83,7 +88,7 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Error checking session:', error);
-      clearStoredAuth();
+      clearAuthCookies();
     } finally {
       setLoading(false);
       setHasCheckedSession(true);
@@ -102,17 +107,22 @@ export const AuthProvider = ({ children }) => {
 
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('session_token', data.session.token);
-        localStorage.setItem('refresh_token', data.session.refresh_token);
+        const { user: storedUser } = getAuthCookies();
+        
+        // Update cookies with new tokens
+        setAuthCookies(storedUser, data.session.token, data.session.refresh_token);
+        
         setSessionToken(data.session.token);
-        setUser(JSON.parse(localStorage.getItem('user')));
+        setUser(storedUser);
+        
+        console.log('Session refreshed successfully');
         return true;
       }
     } catch (error) {
       console.error('Error refreshing session:', error);
     }
     
-    clearStoredAuth();
+    clearAuthCookies();
     return false;
   };
 
@@ -149,16 +159,14 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         const result = await response.json();
         
-        // Store session data
-        localStorage.setItem('user', JSON.stringify(result.user));
-        localStorage.setItem('session_token', result.session.token);
-        localStorage.setItem('refresh_token', result.session.refresh_token);
+        // Store session data in cookies
+        setAuthCookies(result.user, result.session.token, result.session.refresh_token);
         
         // Set user state first, then redirect after a small delay
         setUser(result.user);
         setSessionToken(result.session.token);
         
-        console.log('New user session created:', result.user);
+        console.log('New user session created and stored in cookies:', result.user);
         
         // Delay redirect to ensure state is updated
         setTimeout(() => {
@@ -171,7 +179,7 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Error handling user session:', error);
-      clearStoredAuth();
+      clearAuthCookies();
     }
   };
 
@@ -219,16 +227,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const handleSignOut = () => {
-    clearStoredAuth();
+    clearAuthCookies();
     setUser(null);
     setSessionToken(null);
     setHasCheckedSession(false);
-  };
-
-  const clearStoredAuth = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('session_token');
-    localStorage.removeItem('refresh_token');
   };
 
   // API helper with authentication
@@ -247,7 +249,7 @@ export const AuthProvider = ({ children }) => {
 
     // If unauthorized, try to refresh token
     if (response.status === 401) {
-      const refreshToken = localStorage.getItem('refresh_token');
+      const { refreshToken } = getAuthCookies();
       if (refreshToken && await attemptRefresh(refreshToken)) {
         // Retry with new token
         return fetch(url, {
