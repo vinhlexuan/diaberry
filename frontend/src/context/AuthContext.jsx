@@ -25,10 +25,6 @@ export const AuthProvider = ({ children }) => {
   const [hasCheckedSession, setHasCheckedSession] = useState(false);
 
   useEffect(() => {
-    if (!hasCheckedSession) {
-      checkExistingSession();
-    }
-    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session);
@@ -78,12 +74,10 @@ export const AuthProvider = ({ children }) => {
           }
         }
       } else {
-        // Only check Supabase session if we're on callback page
-        if (window.location.pathname === '/callback') {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session && !sessionToken && !user) {
-            await handleUserSession(session);
-          }
+        // Check for existing Supabase session (for direct dashboard access after OAuth)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && !sessionToken && !user) {
+          await handleUserSession(session);
         }
       }
     } catch (error) {
@@ -94,6 +88,10 @@ export const AuthProvider = ({ children }) => {
       setHasCheckedSession(true);
     }
   };
+
+  useEffect(() => {
+    checkExistingSession();
+  }, []);
 
   const attemptRefresh = async (refreshToken) => {
     try {
@@ -162,18 +160,16 @@ export const AuthProvider = ({ children }) => {
         // Store session data in cookies
         setAuthCookies(result.user, result.session.token, result.session.refresh_token);
         
-        // Set user state first, then redirect after a small delay
+        // Set user state
         setUser(result.user);
         setSessionToken(result.session.token);
         
         console.log('New user session created and stored in cookies:', result.user);
         
-        // Delay redirect to ensure state is updated
-        setTimeout(() => {
-          if (window.location.pathname === '/callback') {
-            window.location.href = '/dashboard';
-          }
-        }, 100);
+        // Redirect to dashboard after successful session creation
+        if (window.location.pathname !== '/dashboard') {
+          window.location.href = '/dashboard';
+        }
       } else {
         throw new Error('Failed to create user session');
       }
@@ -188,7 +184,7 @@ export const AuthProvider = ({ children }) => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/callback`
+          redirectTo: `${window.location.origin}/dashboard`
         }
       });
       

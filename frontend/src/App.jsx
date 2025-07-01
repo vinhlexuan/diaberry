@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
-import AuthCallback from './pages/AuthCallback';
 import Dashboard from './pages/Dashboard';
 import ManageDiary from './pages/ManageDiary';
 
@@ -53,7 +52,6 @@ function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginRoute />} />
-            <Route path="/callback" element={<AuthCallback />} />
             <Route 
               path="/dashboard" 
               element={

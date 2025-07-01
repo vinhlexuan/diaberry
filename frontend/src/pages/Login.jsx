@@ -12,12 +12,14 @@ import {
 } from '@mui/material';
 import { Google } from '@mui/icons-material';
 import { supabase } from '../utils/SupabaseClient';
+import { useAuth } from '../context/AuthContext';
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const { signIn } = useAuth();
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
@@ -32,6 +34,9 @@ function Login() {
       
       if (error) throw error;
       console.log('Logged in:', data);
+      
+      // Redirect to dashboard after successful login
+      window.location.href = '/dashboard';
     } catch (error) {
       console.error('Error logging in:', error.message);
       setError(error.message);
@@ -45,7 +50,7 @@ function Login() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'http://localhost:5173/callback',
+          redirectTo: `${window.location.origin}/dashboard`,
         }
       });
       
